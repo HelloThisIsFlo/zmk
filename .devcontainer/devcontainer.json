@@ -1,7 +1,7 @@
 {
   "name": "ZMK Development",
   "dockerFile": "Dockerfile",
-  "runArgs": ["--security-opt", "label=disable"],
+  "runArgs": ["--security-opt", "label=disable", "--name", "zmk-devcontainer"],
   "containerEnv": {
     "WORKSPACE_DIR": "${containerWorkspaceFolder}",
     "PROMPT_COMMAND": "history -a"
