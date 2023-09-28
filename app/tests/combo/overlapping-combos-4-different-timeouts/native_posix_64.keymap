@@ -1,0 +1,86 @@
+#include <dt-bindings/zmk/keys.h>
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/kscan_mock.h>
+
+/*
+
+TO RUN THE TEST:
+1. Go to app/
+2. Run: 
+    ./run-test.sh tests/combo/overlapping-combos-4-different-timeouts
+
+
+TO DEBUG THE TEST:
+1. IMPORTANT: Run the test first!
+2. (optional) Put breakpoints
+3. Go on the 'Run and Debug' tab in VS Code
+4. Launch: "Run/Debug: tests/combo/overlapping-combos-4-different-timeouts"
+
+
+
+NOTE: The test isn't asserting anything yet, to see it fail, look at the comment in the &kscan section
+
+ */
+/ {
+    combos {
+        compatible = "zmk,combos";
+
+        combo_long {
+            timeout-ms = <70>;
+            key-positions = <0 2>;
+            bindings = <&kp L>;
+        };
+
+        combo_short {
+            timeout-ms = <30>;
+            key-positions = <0 1>;
+            bindings = <&kp S>;
+        };
+
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+        label ="Default keymap";
+
+        default_layer {
+            bindings = <
+                &kp A &kp B
+                &kp C &none
+            >;
+        };
+    };
+};
+
+&kscan {
+    events = <
+        /* if you're debugging these, remember that the timer can be triggered between
+          events while stepping through code. */
+
+
+        /* 
+        This will press key 0 for 100ms. 
+        We would expect:
+        - T+100: Key 0 is pressed
+        - T+130: 'combo_short' expires (press + 30ms) => Nothing happens because we're still waiting to see if combo_long will be matched
+            - We should NOT YET see: on_keymap_binding_pressed: position 0 keycode 0x70004
+        - T+170: 'combo_long' expires (press + 70ms) => Both combos expired, now we're sending the KEY_PRESS binding
+            - We should see: on_keymap_binding_pressed: position 0 keycode 0x70004
+        - T+200: Key 0 is released
+            - We should see: on_keymap_binding_released: position 0 keycode 0x70004
+
+
+        PROBLEM:
+        What actually happens
+        - T+100: ✅ Key 0 is pressed
+        - T+130: ❌ 'combo_short' expires (press + 30ms) => BUG ❌ 'combo_short' expires, there's still one left that hasn't expired but we still release the key now
+            - We should NOT YET see: on_keymap_binding_pressed: position 0 keycode 0x70004
+        - T+170: ❌ 'combo_long' expires (press + 70ms) => Nothing happens because the key has already been released when the 1st combo expired
+            - We should see: on_keymap_binding_pressed: position 0 keycode 0x70004
+        - T+200: ✅ Key 0 is released
+            - We see: on_keymap_binding_released: position 0 keycode 0x70004
+        */
+        ZMK_MOCK_PRESS(0,0,100)
+        ZMK_MOCK_RELEASE(0,0,0)
+    >;
+};
