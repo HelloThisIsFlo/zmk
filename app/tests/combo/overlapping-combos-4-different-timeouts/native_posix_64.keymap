@@ -16,25 +16,27 @@ TO DEBUG THE TEST:
 3. Go on the 'Run and Debug' tab in VS Code
 4. Launch: "Run/Debug: tests/combo/overlapping-combos-4-different-timeouts"
 
-
-
-NOTE: The test isn't asserting anything yet, to see it fail, look at the comment in the &kscan section
-
  */
+
+#define kA 0
+#define kB 1
+#define kC 2
+#define kD 3
+
 / {
     combos {
         compatible = "zmk,combos";
 
-        combo_long {
-            timeout-ms = <70>;
-            key-positions = <0 2>;
-            bindings = <&kp L>;
-        };
-
         combo_short {
             timeout-ms = <30>;
-            key-positions = <0 1>;
+            key-positions = <kA kB>;
             bindings = <&kp S>;
+        };
+
+        combo_long {
+            timeout-ms = <100>;
+            key-positions = <kA kC>;
+            bindings = <&kp L>;
         };
 
     };
@@ -46,41 +48,74 @@ NOTE: The test isn't asserting anything yet, to see it fail, look at the comment
         default_layer {
             bindings = <
                 &kp A &kp B
-                &kp C &none
+                &kp C &kp D
             >;
         };
     };
 };
 
+#define press_A_and_wait(delay_next) \
+    ZMK_MOCK_PRESS(0,0,delay_next)
+#define press_B_and_wait(delay_next) \
+    ZMK_MOCK_PRESS(0,1,delay_next)
+#define press_C_and_wait(delay_next) \
+    ZMK_MOCK_PRESS(1,0,delay_next)
+#define press_D_and_wait(delay_next) \
+    ZMK_MOCK_PRESS(1,1,delay_next)
+
+#define release_A_and_wait(delay_next) \
+    ZMK_MOCK_RELEASE(0,0,delay_next)
+#define release_D_and_wait(delay_next) \
+    ZMK_MOCK_RELEASE(1,1,delay_next)
+ 
 &kscan {
     events = <
-        /* if you're debugging these, remember that the timer can be triggered between
-          events while stepping through code. */
+
+        /*
+        Expected output:
+        ----------------
+        - T+50: Key 0 (A) is pressed
+            - Nothing to see
+        - T+80: 'combo_short' expires (press + 30ms) => Nothing happens because we're still waiting to see if 'combo_long' will be matched
+            - Nothing to see
+        - T+100: Key 4 (D) is pressed and released
+            - We should see: 'position 4 keycode 0x70007'
+        - T+150: 'combo_long' expires (press + 100ms) => Both combos expired, now we're sending the KEY_PRESS binding
+            - We should see: 'position 0 keycode 0x70004' 
+        - T+200: Key 0 (A) is released
+            - Nothing to see
+        - T+220: Key 4 (D) is pressed and released
+            - We should see: 'position 4 keycode 0x70007' 
 
 
-        /* 
-        This will press key 0 for 100ms. 
-        We would expect:
-        - T+100: Key 0 is pressed
-        - T+130: 'combo_short' expires (press + 30ms) => Nothing happens because we're still waiting to see if combo_long will be matched
-            - We should NOT YET see: on_keymap_binding_pressed: position 0 keycode 0x70004
-        - T+170: 'combo_long' expires (press + 70ms) => Both combos expired, now we're sending the KEY_PRESS binding
-            - We should see: on_keymap_binding_pressed: position 0 keycode 0x70004
-        - T+200: Key 0 is released
-            - We should see: on_keymap_binding_released: position 0 keycode 0x70004
+        We don't have access to the timings in the snapshot, so this order allows to test timeouts based on the sequence on keycode sent.
+        If everything works as expected, we should send: D, A, D.
 
-
-        PROBLEM:
-        What actually happens
-        - T+100: ✅ Key 0 is pressed
-        - T+130: ❌ 'combo_short' expires (press + 30ms) => BUG ❌ 'combo_short' expires, there's still one left that hasn't expired but we still release the key now
-            - We should NOT YET see: on_keymap_binding_pressed: position 0 keycode 0x70004
-        - T+170: ❌ 'combo_long' expires (press + 70ms) => Nothing happens because the key has already been released when the 1st combo expired
-            - We should see: on_keymap_binding_pressed: position 0 keycode 0x70004
-        - T+200: ✅ Key 0 is released
-            - We see: on_keymap_binding_released: position 0 keycode 0x70004
+        Current problem: ❌
+        ----------------
+        At the moment there's a bug where whenever the shortest combo expires, we stop waiting for other candidates. With that buggy behavior
+        zmk will send instead: A, D, D. Because the expiry of 'combo_short' will output A before the first D.
         */
-        ZMK_MOCK_PRESS(0,0,100)
-        ZMK_MOCK_RELEASE(0,0,0)
+
+
+        /* Note: This starts at T+50 because the ZMK_MOCK_PRESS seems to launch the first event at T+(first wait duration). So in our case T+50 */
+
+        /* T+50+0=    T+50: Press A and wait 50ms */
+        press_A_and_wait(50)
+
+        /* T+50+30=   T+80: 'combo_short' should expire */
+
+        /* T+50+50=  T+100: Press D and release 10ms later */
+        press_D_and_wait(10)
+        release_D_and_wait(90)
+
+        /* T+50+100= T+150: 'combo_long' should expire */
+
+        /* T+50+150= T+200: Release A */
+        release_A_and_wait(20)
+
+        /* T+50+170=  T+220: Press D and release 10ms later */
+        press_D_and_wait(10)
+        release_D_and_wait(0)
     >;
 };
