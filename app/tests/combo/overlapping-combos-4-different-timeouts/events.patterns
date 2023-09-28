@@ -1,1 +1,1 @@
-s/.*on_keymap_binding_pressed: //p
+s/.*on_keymap_binding_released: //p
