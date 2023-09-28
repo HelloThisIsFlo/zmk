@@ -1,0 +1,16 @@
+<component name="ProjectCodeStyleConfiguration">
+  <code_scheme name="Project" version="173">
+    <SQLiteCodeStyleSettings version="6">
+      <option name="KEYWORD_CASE" value="2" />
+    </SQLiteCodeStyleSettings>
+    <SqlCodeStyleSettings version="6">
+      <option name="KEYWORD_CASE" value="2" />
+    </SqlCodeStyleSettings>
+    <clangFormatSettings>
+      <option name="ENABLED" value="true" />
+    </clangFormatSettings>
+    <codeStyleSettings language="Python">
+      <option name="RIGHT_MARGIN" value="80" />
+    </codeStyleSettings>
+  </code_scheme>
+</component>
