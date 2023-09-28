@@ -93,6 +93,11 @@ static inline int set_layer_state(uint8_t layer, bool state) {
     // Don't send state changes unless there was an actual change
     if (old_state != _zmk_keymap_layer_state) {
         LOG_DBG("layer_changed: layer %d state %d", layer, state);
+        if (state) {
+            LOG_INF("LAYER       : ON      layer=%d                                                                    ", layer);
+        } else {
+            LOG_INF("LAYER       : OFF     layer=%d                                                                    ", layer);
+        } 
         ZMK_EVENT_RAISE(create_layer_state_changed(layer, state));
     }
 
@@ -178,6 +183,11 @@ int zmk_keymap_apply_position_state(uint8_t source, int layer, uint32_t position
     };
 
     LOG_DBG("layer: %d position: %d, binding name: %s", layer, position, binding.behavior_dev);
+    if (pressed) {
+        LOG_INF("KEY STATE   : PRESS   '%s'                     | pos=%d layer=%d", binding.behavior_dev, position, layer);
+    } else {
+        LOG_INF("KEY STATE   : RELEASE '%s'                     | pos=%d layer=%d", binding.behavior_dev, position, layer);
+    }
 
     behavior = device_get_binding(binding.behavior_dev);
 

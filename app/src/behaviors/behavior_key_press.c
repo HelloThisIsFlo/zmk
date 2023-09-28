@@ -21,6 +21,9 @@ static int behavior_key_press_init(const struct device *dev) { return 0; };
 static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
     LOG_DBG("position %d keycode 0x%02X", event.position, binding->param1);
+    if (event.position != 35) {
+        LOG_INF("KP          : PRESS   pos=%d kc=0x%02X", event.position, binding->param1);
+    }
     return ZMK_EVENT_RAISE(
         zmk_keycode_state_changed_from_encoded(binding->param1, true, event.timestamp));
 }
@@ -28,6 +31,41 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
 static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
                                       struct zmk_behavior_binding_event event) {
     LOG_DBG("position %d keycode 0x%02X", event.position, binding->param1);
+    if (event.position != 35) {
+        LOG_INF("KP          : RELEASE pos=%d kc=0x%02X", event.position, binding->param1);
+    }
+    if (event.position == 35) {
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+        LOG_INF("");
+    }
     return ZMK_EVENT_RAISE(
         zmk_keycode_state_changed_from_encoded(binding->param1, false, event.timestamp));
 }

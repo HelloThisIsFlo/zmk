@@ -35,8 +35,10 @@ static void behavior_queue_process_next(struct k_work *work) {
                                                    .timestamp = k_uptime_get()};
 
         if (item.press) {
+            LOG_INF("QUEUE INVOKE: PRESS   '%s' p1=0x%02x p2=0x%02x | wait=%d", item.binding.behavior_dev, item.binding.param1, item.binding.param2, item.wait);
             behavior_keymap_binding_pressed(&item.binding, event);
         } else {
+            LOG_INF("QUEUE INVOKE: RELEASE '%s' p1=0x%02x p2=0x%02x | wait=%d", item.binding.behavior_dev, item.binding.param1, item.binding.param2, item.wait);
             behavior_keymap_binding_released(&item.binding, event);
         }
 
@@ -52,6 +54,12 @@ static void behavior_queue_process_next(struct k_work *work) {
 int zmk_behavior_queue_add(uint32_t position, const struct zmk_behavior_binding binding, bool press,
                            uint32_t wait) {
     struct q_item item = {.press = press, .binding = binding, .wait = wait};
+
+    if (item.press) {
+        LOG_INF("QUEUE ENQUE : PRESS   '%s' p1=0x%02x p2=0x%02x | wait=%d", item.binding.behavior_dev, item.binding.param1, item.binding.param2, item.wait);
+    } else {
+        LOG_INF("QUEUE ENQUE : RELEASE '%s' p1=0x%02x p2=0x%02x | wait=%d", item.binding.behavior_dev, item.binding.param1, item.binding.param2, item.wait);
+    }
 
     const int ret = k_msgq_put(&zmk_behavior_queue_msgq, &item, K_NO_WAIT);
     if (ret < 0) {

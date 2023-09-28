@@ -165,13 +165,16 @@ static void queue_macro(uint32_t position, const struct zmk_behavior_binding bin
 
             switch (state.mode) {
             case MACRO_MODE_TAP:
+                LOG_INF("MACRO       : TAP     '%s' p1=0x%02X p2=0x%02X | wait=%d tap=%d pos=%d start_idx=%d count=%d", binding.behavior_dev,  binding.param1, binding.param2, state.wait_ms, state.tap_ms, position, state.start_index, state.count);
                 zmk_behavior_queue_add(position, binding, true, state.tap_ms);
                 zmk_behavior_queue_add(position, binding, false, state.wait_ms);
                 break;
             case MACRO_MODE_PRESS:
+                LOG_INF("MACRO       : PRESS   '%s' p1=0x%02X p2=0x%02X | wait=%d tap=/  pos=%d start_idx=%d count=%d", binding.behavior_dev,  binding.param1, binding.param2, state.wait_ms, position, state.start_index, state.count);
                 zmk_behavior_queue_add(position, binding, true, state.wait_ms);
                 break;
             case MACRO_MODE_RELEASE:
+                LOG_INF("MACRO       : RELEASE '%s' p1=0x%02X p2=0x%02X | wait=%d tap=/  pos=%d start_idx=%d count=%d", binding.behavior_dev,  binding.param1, binding.param2, state.wait_ms, position, state.start_index, state.count);
                 zmk_behavior_queue_add(position, binding, false, state.wait_ms);
                 break;
             default:
