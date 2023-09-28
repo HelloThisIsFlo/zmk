@@ -31,7 +31,7 @@ BUILDDIR="$DIR/app/build/$SIDE"
 
 if [ ! -d "$BUILDDIR" ]; then
     echo "Build directory $BUILDDIR does not exist. Performing full build"
-    west build -d $BUILDDIR -b nice_nano_v2 -- -DSHIELD="corne_$SIDE nice_view_adapter nice_view" -DZMK_CONFIG="$ZMK_CONFIG"
+    west build -d $BUILDDIR -b nice_nano_v2 -- -DSHIELD="corne_$SIDE nice_view_adapter nice_view" -DZMK_CONFIG="$ZMK_CONFIG" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 else
     echo "Build directory $BUILDDIR exists. Performing build with cache"
     west build -d $BUILDDIR
