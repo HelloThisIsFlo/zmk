@@ -2,22 +2,6 @@
 #include <behaviors.dtsi>
 #include <dt-bindings/zmk/kscan_mock.h>
 
-/*
-
-TO RUN THE TEST:
-1. Go to app/
-2. Run: 
-    ./run-test.sh tests/combo/overlapping-combos-4-different-timeouts
-
-
-TO DEBUG THE TEST:
-1. IMPORTANT: Run the test first!
-2. (optional) Put breakpoints
-3. Go on the 'Run and Debug' tab in VS Code
-4. Launch: "Run/Debug: tests/combo/overlapping-combos-4-different-timeouts"
-
- */
-
 #define kA 0
 #define kB 1
 #define kC 2
@@ -27,16 +11,21 @@ TO DEBUG THE TEST:
     combos {
         compatible = "zmk,combos";
 
-        combo_short {
-            timeout-ms = <30>;
-            key-positions = <kA kB>;
-            bindings = <&kp S>;
+        // Intentionally out of order in the config, to make sure 'combo.c' handles it properly
+        combo_40 {
+            timeout-ms = <40>;
+            key-positions = <kA kD>;
+            bindings = <&kp Z>;
         };
-
-        combo_long {
-            timeout-ms = <100>;
+        combo_20 {
+            timeout-ms = <20>;
+            key-positions = <kA kB>;
+            bindings = <&kp X>;
+        };
+        combo_30 {
+            timeout-ms = <30>;
             key-positions = <kA kC>;
-            bindings = <&kp L>;
+            bindings = <&kp Y>;
         };
 
     };
@@ -70,52 +59,40 @@ TO DEBUG THE TEST:
  
 &kscan {
     events = <
-
-        /*
-        Expected output:
-        ----------------
-        - T+50: Key 0 (A) is pressed
-            - Nothing to see
-        - T+80: 'combo_short' expires (press + 30ms) => Nothing happens because we're still waiting to see if 'combo_long' will be matched
-            - Nothing to see
-        - T+100: Key 4 (D) is pressed and released
-            - We should see: 'position 4 keycode 0x70007'
-        - T+150: 'combo_long' expires (press + 100ms) => Both combos expired, now we're sending the KEY_PRESS binding
-            - We should see: 'position 0 keycode 0x70004' 
-        - T+200: Key 0 (A) is released
-            - Nothing to see
-        - T+220: Key 4 (D) is pressed and released
-            - We should see: 'position 4 keycode 0x70007' 
-
-
-        We don't have access to the timings in the snapshot, so this order allows to test timeouts based on the sequence on keycode sent.
-        If everything works as expected, we should send: D, A, D.
-
-        Current problem: ❌
-        ----------------
-        At the moment there's a bug where whenever the shortest combo expires, we stop waiting for other candidates. With that buggy behavior
-        zmk will send instead: A, D, D. Because the expiry of 'combo_short' will output A before the first D.
-        */
-
-
         /* Note: This starts at T+50 because the ZMK_MOCK_PRESS seems to launch the first event at T+(first wait duration). So in our case T+50 */
+
+
+
+        /*** First Phase: All 3 combos expire ***/
 
         /* T+50+0=    T+50: Press A and wait 50ms */
         press_A_and_wait(50)
 
-        /* T+50+30=   T+80: 'combo_short' should expire */
+        /* T+50+20=   T+70: 'combo_20' should expire */
+        /* T+50+30=   T+80: 'combo_30' should expire */
+        /* T+50+40=   T+90: 'combo_40' should expire, and we should send the keycode 'A' */
 
-        /* T+50+50=  T+100: Press D and release 10ms later */
-        press_D_and_wait(10)
-        release_D_and_wait(90)
-
-        /* T+50+100= T+150: 'combo_long' should expire */
-
-        /* T+50+150= T+200: Release A */
+        /* T+50+50=  T+100: We release A and wait 20ms */
         release_A_and_wait(20)
 
-        /* T+50+170=  T+220: Press D and release 10ms later */
-        press_D_and_wait(10)
+
+
+        /*** Second Phase: 2 combo expire, 1 combo triggers ***/
+
+        /* T+120+0=  T+120: Press A and wait 35ms */
+        press_A_and_wait(35)
+
+        /* T+120+20= T+140: 'combo_20' should expire */
+        /* T+120+30= T+150: 'combo_30' should expire */
+
+        /* T+120+35= T+155: We press 'D', this should trigger 'combo_40' and send the keycode 'Z'. We wait 15ms */
+        press_D_and_wait(15)
+
+
+
+        /*** Cleanup ***/
+        /* T+120+50= T+170: We release both keys */
+        release_A_and_wait(20)
         release_D_and_wait(0)
     >;
 };
