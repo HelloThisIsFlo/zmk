@@ -1,4 +1,6 @@
 #!/bin/bash
+# Runs INSIDE the zmk-devcontainer. Called by 'build_and_flash.sh' on the host.
+# Usage: build_from_docker.sh left|right|reset [--pristine]
 set -eo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -15,26 +17,34 @@ else
     exit 1
 fi
 
-if [ "$1" == "left" ]; then
-    echo "Flashing Left side"
-    SIDE='left'
-elif [ "$1" == "right" ]; then
-    echo "Flashing Right side"
-    SIDE='right'
+TARGET="$1"
+PRISTINE='auto'
+if [ "$2" == "--pristine" ]; then
+    PRISTINE='always'
+fi
+
+if [ "$TARGET" == "left" ] || [ "$TARGET" == "right" ]; then
+    echo "Building $TARGET side"
+    BUILD_ARGS=(-b nice_nano_v2 -- -DSHIELD="corne_$TARGET nice_view_adapter nice_view" -DZMK_CONFIG="$ZMK_CONFIG" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON)
+elif [ "$TARGET" == "reset" ]; then
+    echo "Building settings_reset"
+    TARGET='settings_reset'
+    BUILD_ARGS=(-b nice_nano_v2 -- -DSHIELD=settings_reset)
 else
-    echo "Invalid argument. Please provide either 'left' or 'right'"
+    echo "Invalid argument. Please provide 'left', 'right' or 'reset'"
     exit 1
 fi
-BUILDDIR="$DIR/app/build/$SIDE"
+BUILDDIR="$DIR/app/build/$TARGET"
 
 
-
-if [ ! -d "$BUILDDIR" ]; then
-    echo "Build directory $BUILDDIR does not exist. Performing full build"
-    west build -d $BUILDDIR -b nice_nano_v2 -- -DSHIELD="corne_$SIDE nice_view_adapter nice_view" -DZMK_CONFIG="$ZMK_CONFIG" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+# Board/shield args are only needed for the first (or a pristine) build.
+# Note: a new '.conf' file in zmk-config is only picked up by a pristine build.
+if [ ! -d "$BUILDDIR" ] || [ "$PRISTINE" == "always" ]; then
+    echo "Performing full build in $BUILDDIR"
+    west build -p always -d "$BUILDDIR" "${BUILD_ARGS[@]}"
 else
     echo "Build directory $BUILDDIR exists. Performing build with cache"
-    west build -d $BUILDDIR
+    west build -d "$BUILDDIR"
 fi
 
 
