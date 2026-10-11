@@ -1,11 +1,12 @@
 #!/bin/bash
 # Build in the zmk-devcontainer, then wait for each half to enter bootloader mode and flash it.
 #
-# Usage: ./build_and_flash.sh left|right|both|reset [--pristine] [--no-flash]
+# Usage: ./build_and_flash.sh <unit> left|right|both|reset [--pristine] [--no-flash]
+#   <unit>      A physical keyboard from 'zmk-config/config/targets.txt' (e.g. chocofi-pro)
 #   left|right  Build + flash one half
 #   both        Build + flash left, then right
 #   reset       Flash 'settings_reset' to both halves (wipes BT bonds + split pairing)
-#   --pristine  Full rebuild (needed after adding a new '.conf' file to zmk-config)
+#   --pristine  Full rebuild (needed after adding a new '.conf' file or changing 'targets.txt')
 #   --no-flash  Build only (e.g. to verify compilation)
 #
 # Bootloader mode: double-tap the reset button on the nice!nano (or BIOS layer -> &bootloader)
@@ -15,6 +16,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR"
 
 CONTAINER=zmk-devcontainer
+TARGETS="$DIR/../zmk-config/config/targets.txt"
 VOLUME=/Volumes/NICENANO
 MOUNT_TIMEOUT_SEC=120
 UNMOUNT_TIMEOUT_SEC=30
@@ -24,8 +26,15 @@ if west status 2> /dev/null; then
     exit 1
 fi
 
-TARGET="$1"
-shift || true
+usage() {
+    echo "Usage: $0 <unit> left|right|both|reset [--pristine] [--no-flash]"
+    echo "Units: $(awk '!/^#/ && NF {printf "%s ", $1}' "$TARGETS")"
+    exit 1
+}
+
+UNIT="$1"
+TARGET="$2"
+shift 2 || usage
 PRISTINE=''
 NO_FLASH=false
 for OPT in "$@"; do
@@ -35,30 +44,41 @@ for OPT in "$@"; do
         *) echo "Unknown option: $OPT"; exit 1 ;;
     esac
 done
+
+# --- Resolve the unit: 'unit keyboard board shields...' ---
+ROW="$(awk -v u="$UNIT" '!/^#/ && $1 == u' "$TARGETS")"
+[ -n "$ROW" ] || { echo "❌ Unknown unit: '$UNIT'"; usage; }
+read -r _ KEYBOARD BOARD SHIELDS <<< "$ROW"
+shields_for() { echo "${SHIELDS//\{side\}/$1}"; }
+
+RESET="reset-$BOARD"
 case "$TARGET" in
-    left)  BUILDS=(left);           FLASHES=(left:left) ;;
-    right) BUILDS=(right);          FLASHES=(right:right) ;;
-    both)  BUILDS=(left right);     FLASHES=(left:left right:right) ;;
-    reset) BUILDS=(settings_reset); FLASHES=(left:settings_reset right:settings_reset) ;;
-    *)
-        echo "Usage: $0 left|right|both|reset [--pristine] [--no-flash]"
-        exit 1
-        ;;
+    left)  BUILDS=(left);       FLASHES=(left:$UNIT/left) ;;
+    right) BUILDS=(right);      FLASHES=(right:$UNIT/right) ;;
+    both)  BUILDS=(left right); FLASHES=(left:$UNIT/left right:$UNIT/right) ;;
+    reset) BUILDS=(reset);      FLASHES=(left:$RESET right:$RESET) ;;
+    *) usage ;;
 esac
 
 
 # --- Container ---
-if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "true" ]; then
+if ! docker inspect "$CONTAINER" >/dev/null 2>&1; then
+    echo "🐳 Creating $CONTAINER"
+    devcontainer up --workspace-folder "$DIR" >/dev/null
+elif [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER")" != "true" ]; then
     echo "🐳 Starting $CONTAINER"
     docker start "$CONTAINER" >/dev/null
 fi
 
 
 # --- Build (everything first, so flashing isn't interrupted by a failed build) ---
+echo "⌨️  Unit: $UNIT (keyboard: $KEYBOARD)"
 for BUILD in "${BUILDS[@]}"; do
-    ARG="$BUILD"
-    [ "$BUILD" == "settings_reset" ] && ARG='reset'
-    docker exec "$CONTAINER" /workspaces/zmk/build_from_docker.sh "$ARG" $PRISTINE
+    if [ "$BUILD" == "reset" ]; then
+        docker exec "$CONTAINER" /workspaces/zmk/build_from_docker.sh "$RESET" "$BOARD" settings_reset $PRISTINE
+    else
+        docker exec "$CONTAINER" /workspaces/zmk/build_from_docker.sh "$UNIT/$BUILD" "$BOARD" "$(shields_for "$BUILD")" "$KEYBOARD" "$UNIT" $PRISTINE
+    fi
 done
 
 
@@ -94,7 +114,7 @@ for FLASH in "${FLASHES[@]}"; do
         sleep 1 # Let macOS finish mounting
     fi
 
-    echo "⚡ Flashing $(basename "$(dirname "$(dirname "$UF2")")") to $SIDE_UPPER"
+    echo "⚡ Flashing ${FLASH##*:} to $SIDE_UPPER"
     # macOS '/bin/cp' (GNU cp may be first on PATH); '-X' skips xattrs the bootloader doesn't want.
     # The board reboots as soon as the copy completes, which can make 'cp' report an I/O error
     /bin/cp -X "$UF2" "$VOLUME/" || wait_for_volume absent 5 || { echo "❌ Copy failed"; exit 1; }
