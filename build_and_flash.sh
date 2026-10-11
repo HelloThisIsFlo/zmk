@@ -83,16 +83,16 @@ for FLASH in "${FLASHES[@]}"; do
     SIDE="${FLASH%%:*}"
     UF2="$DIR/app/build/${FLASH##*:}/zephyr/zmk.uf2"
 
-    if [ -d "$VOLUME" ]; then
-        echo "⏳ $VOLUME is still mounted, waiting for it to go away..."
-        wait_for_volume absent "$UNMOUNT_TIMEOUT_SEC" || { echo "❌ $VOLUME never unmounted"; exit 1; }
-    fi
-
     SIDE_UPPER="$(echo "$SIDE" | tr '[:lower:]' '[:upper:]')"
     echo ""
-    echo "👉 Plug in the $SIDE_UPPER half and double-tap its reset button"
-    wait_for_volume present "$MOUNT_TIMEOUT_SEC" || { echo "❌ Timed out waiting for $VOLUME"; exit 1; }
-    sleep 1 # Let macOS finish mounting
+    if [ -d "$VOLUME" ]; then
+        # Already in bootloader (reset double-tapped during the build): flash it right away
+        echo "👉 $VOLUME already mounted, assuming it's the $SIDE_UPPER half"
+    else
+        echo "👉 Plug in the $SIDE_UPPER half and double-tap its reset button"
+        wait_for_volume present "$MOUNT_TIMEOUT_SEC" || { echo "❌ Timed out waiting for $VOLUME"; exit 1; }
+        sleep 1 # Let macOS finish mounting
+    fi
 
     echo "⚡ Flashing $(basename "$(dirname "$(dirname "$UF2")")") to $SIDE_UPPER"
     # macOS '/bin/cp' (GNU cp may be first on PATH); '-X' skips xattrs the bootloader doesn't want.
